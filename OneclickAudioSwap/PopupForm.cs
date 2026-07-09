@@ -5,13 +5,18 @@ namespace OneclickAudioSwap;
 
 internal sealed class PopupForm : Form
 {
-    private static readonly Color BackPanel = Color.FromArgb(249, 249, 249);
-    private static readonly Color Border = Color.FromArgb(218, 218, 218);
-    private static readonly Color TextMain = Color.FromArgb(31, 31, 31);
-    private static readonly Color TextMuted = Color.FromArgb(102, 102, 102);
+    private const double BackgroundOpacity = 0.70;
+
+    private static readonly Color TransparentBack = Color.Fuchsia;
+    private static readonly Color BackPanel = Color.FromArgb(32, 32, 32);
+    private static readonly Color Border = Color.FromArgb(75, 75, 75);
+    private static readonly Color TextMain = Color.FromArgb(245, 245, 245);
+    private static readonly Color TextMuted = Color.FromArgb(196, 196, 196);
 
     private readonly AudioDeviceService _audioDeviceService;
     private readonly DefaultDeviceService _defaultDeviceService;
+    private readonly PopupBackgroundForm _backgroundForm = new(BackPanel, BackgroundOpacity);
+    private bool _readyToCloseOnDeactivate;
 
     public PopupForm(AudioDeviceService audioDeviceService, DefaultDeviceService defaultDeviceService, Icon appIcon)
     {
@@ -20,7 +25,9 @@ internal sealed class PopupForm : Form
 
         Text = "OneclickAudioSwap";
         Icon = appIcon;
-        BackColor = BackPanel;
+        BackColor = TransparentBack;
+        TransparencyKey = TransparentBack;
+        TopMost = true;
         FormBorderStyle = FormBorderStyle.None;
         MaximizeBox = false;
         MinimizeBox = false;
@@ -32,10 +39,42 @@ internal sealed class PopupForm : Form
         BuildDeviceList();
     }
 
+    protected override void OnShown(EventArgs e)
+    {
+        SyncBackgroundForm();
+        _backgroundForm.Show(this);
+        base.OnShown(e);
+        Activate();
+        BringToFront();
+        _readyToCloseOnDeactivate = true;
+    }
+
+    protected override void OnMove(EventArgs e)
+    {
+        base.OnMove(e);
+        SyncBackgroundForm();
+    }
+
+    protected override void OnResize(EventArgs e)
+    {
+        base.OnResize(e);
+        SyncBackgroundForm();
+    }
+
     protected override void OnDeactivate(EventArgs e)
     {
         base.OnDeactivate(e);
-        Close();
+        if (_readyToCloseOnDeactivate)
+        {
+            Close();
+        }
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        _backgroundForm.Close();
+        _backgroundForm.Dispose();
+        base.OnClosed(e);
     }
 
     protected override void OnPaint(PaintEventArgs e)
@@ -43,6 +82,14 @@ internal sealed class PopupForm : Form
         base.OnPaint(e);
         using var pen = new Pen(Border);
         e.Graphics.DrawRectangle(pen, 0, 0, Width - 1, Height - 1);
+    }
+
+    private void SyncBackgroundForm()
+    {
+        if (!IsDisposed)
+        {
+            _backgroundForm.Bounds = Bounds;
+        }
     }
 
     private void BuildDeviceList()
@@ -54,7 +101,7 @@ internal sealed class PopupForm : Form
             Dock = DockStyle.Top,
             Height = 58,
             Padding = new Padding(16, 12, 16, 6),
-            BackColor = BackPanel
+            BackColor = TransparentBack
         };
 
         header.Controls.Add(new Label
@@ -63,8 +110,9 @@ internal sealed class PopupForm : Form
             Dock = DockStyle.Top,
             Height = 20,
             Text = "Output device",
-            Font = new Font(Font.FontFamily, 10.5f, FontStyle.Bold),
-            ForeColor = TextMain
+            Font = BoldFont(10.5f),
+            ForeColor = TextMain,
+            BackColor = TransparentBack
         });
 
         header.Controls.Add(new Label
@@ -73,8 +121,9 @@ internal sealed class PopupForm : Form
             Dock = DockStyle.Bottom,
             Height = 18,
             Text = "Select a device to use for all Windows output roles",
-            Font = new Font(Font.FontFamily, 8.5f),
-            ForeColor = TextMuted
+            Font = BoldFont(8.5f),
+            ForeColor = TextMuted,
+            BackColor = TransparentBack
         });
 
         var list = new FlowLayoutPanel
@@ -84,7 +133,7 @@ internal sealed class PopupForm : Form
             WrapContents = false,
             AutoScroll = true,
             Padding = new Padding(10, 4, 10, 10),
-            BackColor = BackPanel
+            BackColor = TransparentBack
         };
 
         Controls.Add(list);
@@ -127,8 +176,15 @@ internal sealed class PopupForm : Form
             Margin = new Padding(4, 8, 4, 4),
             Text = text,
             TextAlign = ContentAlignment.MiddleLeft,
-            ForeColor = TextMain
+            Font = BoldFont(9f),
+            ForeColor = TextMain,
+            BackColor = TransparentBack
         };
+    }
+
+    private static Font BoldFont(float size)
+    {
+        return new Font(FontFamily.GenericSansSerif, size, FontStyle.Bold);
     }
 
     private void OnDeviceSelected(AudioDevice device)
@@ -144,11 +200,24 @@ internal sealed class PopupForm : Form
         }
     }
 
+    private sealed class PopupBackgroundForm : Form
+    {
+        public PopupBackgroundForm(Color backColor, double opacity)
+        {
+            BackColor = backColor;
+            Opacity = opacity;
+            TopMost = true;
+            FormBorderStyle = FormBorderStyle.None;
+            ShowInTaskbar = false;
+            StartPosition = FormStartPosition.Manual;
+        }
+    }
+
     private sealed class DeviceItemControl : Control
     {
-        private static readonly Color HoverBack = Color.FromArgb(237, 237, 237);
-        private static readonly Color SelectedBack = Color.FromArgb(232, 240, 254);
-        private static readonly Color SelectedMark = Color.FromArgb(0, 95, 184);
+        private static readonly Color HoverBack = Color.FromArgb(58, 58, 58);
+        private static readonly Color SelectedBack = Color.FromArgb(48, 68, 88);
+        private static readonly Color SelectedMark = Color.FromArgb(96, 205, 255);
 
         private readonly AudioDevice _device;
         private readonly bool _selected;
@@ -165,6 +234,7 @@ internal sealed class PopupForm : Form
             Height = 42;
             Margin = new Padding(0, 2, 0, 2);
             Cursor = Cursors.Hand;
+            Font = BoldFont(9f);
             DoubleBuffered = true;
         }
 
@@ -194,7 +264,7 @@ internal sealed class PopupForm : Form
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
 
             var bounds = new Rectangle(0, 0, Width - 1, Height - 1);
-            using var background = new SolidBrush(_selected ? SelectedBack : _hovered ? HoverBack : BackPanel);
+            using var background = new SolidBrush(_selected ? SelectedBack : _hovered ? HoverBack : TransparentBack);
             e.Graphics.FillRectangle(background, bounds);
 
             if (_selected)
