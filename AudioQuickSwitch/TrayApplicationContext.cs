@@ -1,14 +1,20 @@
-﻿namespace AudioQuickSwitch;
+﻿using AudioQuickSwitch.Services;
+
+namespace AudioQuickSwitch;
 
 internal sealed class TrayApplicationContext : ApplicationContext
 {
+    private readonly Icon _appIcon;
+    private readonly AudioDeviceService _audioDeviceService = new();
+    private readonly DefaultDeviceService _defaultDeviceService = new();
     private readonly NotifyIcon _trayIcon;
 
     public TrayApplicationContext()
     {
+        _appIcon = new Icon(Path.Combine(AppContext.BaseDirectory, "oneclick-audio-swap.ico"));
         _trayIcon = new NotifyIcon
         {
-            Icon = new Icon(Path.Combine(AppContext.BaseDirectory, "oneclick-audio-swap.ico")),
+            Icon = _appIcon,
             Text = "AudioQuickSwitch",
             Visible = true,
             ContextMenuStrip = BuildContextMenu()
@@ -23,6 +29,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         {
             _trayIcon.MouseClick -= OnTrayIconMouseClick;
             _trayIcon.Dispose();
+            _appIcon.Dispose();
         }
 
         base.Dispose(disposing);
@@ -42,7 +49,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
             return;
         }
 
-        using var popup = new PopupForm();
+        using var popup = new PopupForm(_audioDeviceService, _defaultDeviceService, _appIcon);
         popup.StartPosition = FormStartPosition.Manual;
         popup.Location = GetPopupLocation(popup.Size);
         popup.ShowDialog();
