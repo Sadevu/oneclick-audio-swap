@@ -1,0 +1,32 @@
+﻿# Build output
+bin/
+obj/
+out/
+publish/
+artifacts/
+
+# Visual Studio / Rider / VS Code local state
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Logs and diagnostics
+*.log
+*.binlog
+TestResults/
+
+# Local environment / secrets
+.env
+.env.*
+*.local
+*.pfx
+*.snk
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
