@@ -1,22 +1,37 @@
 ﻿using System.Drawing.Drawing2D;
+using System.Drawing.Imaging;
+using System.Runtime.InteropServices;
 using OneclickAudioSwap.Services;
 
 namespace OneclickAudioSwap;
 
 internal sealed class PopupForm : Form
 {
-    private const double BackgroundOpacity = 0.70;
+    private const byte BackgroundAlpha = 178;
+    private const int HeaderHeight = 62;
+    private const int ListTop = 70;
+    private const int RowHeight = 42;
+    private const int RowGap = 4;
+    private const int ItemLeft = 10;
+    private const int ItemWidth = 326;
 
-    private static readonly Color TransparentBack = Color.Fuchsia;
-    private static readonly Color BackPanel = Color.FromArgb(32, 32, 32);
-    private static readonly Color Border = Color.FromArgb(75, 75, 75);
-    private static readonly Color TextMain = Color.FromArgb(245, 245, 245);
-    private static readonly Color TextMuted = Color.FromArgb(196, 196, 196);
+    private static readonly Color BackPanel = Color.FromArgb(BackgroundAlpha, 32, 32, 32);
+    private static readonly Color Border = Color.FromArgb(255, 75, 75, 75);
+    private static readonly Color TextMain = Color.White;
+    private static readonly Color TextMuted = Color.FromArgb(255, 230, 230, 230);
+    private static readonly Color HoverBack = Color.FromArgb(235, 58, 58, 58);
+    private static readonly Color SelectedBack = Color.FromArgb(235, 48, 68, 88);
+    private static readonly Color SelectedMark = Color.FromArgb(255, 96, 205, 255);
 
     private readonly AudioDeviceService _audioDeviceService;
     private readonly DefaultDeviceService _defaultDeviceService;
-    private readonly PopupBackgroundForm _backgroundForm = new(BackPanel, BackgroundOpacity);
-    private bool _readyToCloseOnDeactivate;
+    private readonly Font _titleFont = new(FontFamily.GenericSansSerif, 10.5f, FontStyle.Bold);
+    private readonly Font _captionFont = new(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold);
+    private readonly Font _itemFont = new(FontFamily.GenericSansSerif, 9f, FontStyle.Bold);
+    private IReadOnlyList<AudioDevice> _devices = Array.Empty<AudioDevice>();
+    private string? _defaultDeviceId;
+    private string? _errorMessage;
+    private int _hoveredIndex = -1;
 
     public PopupForm(AudioDeviceService audioDeviceService, DefaultDeviceService defaultDeviceService, Icon appIcon)
     {
@@ -25,166 +40,132 @@ internal sealed class PopupForm : Form
 
         Text = "OneclickAudioSwap";
         Icon = appIcon;
-        BackColor = TransparentBack;
-        TransparencyKey = TransparentBack;
         TopMost = true;
         FormBorderStyle = FormBorderStyle.None;
         MaximizeBox = false;
         MinimizeBox = false;
         ShowInTaskbar = false;
         Size = new Size(360, 300);
-        Padding = new Padding(1);
         DoubleBuffered = true;
+        LoadDevices();
+    }
 
-        BuildDeviceList();
+    protected override CreateParams CreateParams
+    {
+        get
+        {
+            const int wsExLayered = 0x00080000;
+            var createParams = base.CreateParams;
+            createParams.ExStyle |= wsExLayered;
+            return createParams;
+        }
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _titleFont.Dispose();
+            _captionFont.Dispose();
+            _itemFont.Dispose();
+        }
+
+        base.Dispose(disposing);
     }
 
     protected override void OnShown(EventArgs e)
     {
-        SyncBackgroundForm();
-        _backgroundForm.Show(this);
         base.OnShown(e);
         Activate();
         BringToFront();
-        _readyToCloseOnDeactivate = true;
+        RenderLayeredWindow();
     }
 
     protected override void OnMove(EventArgs e)
     {
         base.OnMove(e);
-        SyncBackgroundForm();
-    }
-
-    protected override void OnResize(EventArgs e)
-    {
-        base.OnResize(e);
-        SyncBackgroundForm();
+        if (IsHandleCreated)
+        {
+            RenderLayeredWindow();
+        }
     }
 
     protected override void OnDeactivate(EventArgs e)
     {
         base.OnDeactivate(e);
-        if (_readyToCloseOnDeactivate)
-        {
-            Close();
-        }
+        Close();
     }
 
-    protected override void OnClosed(EventArgs e)
+    protected override void OnMouseMove(MouseEventArgs e)
     {
-        _backgroundForm.Close();
-        _backgroundForm.Dispose();
-        base.OnClosed(e);
-    }
-
-    protected override void OnPaint(PaintEventArgs e)
-    {
-        base.OnPaint(e);
-        using var pen = new Pen(Border);
-        e.Graphics.DrawRectangle(pen, 0, 0, Width - 1, Height - 1);
-    }
-
-    private void SyncBackgroundForm()
-    {
-        if (!IsDisposed)
+        base.OnMouseMove(e);
+        var hoveredIndex = HitTestDevice(e.Location);
+        if (hoveredIndex == _hoveredIndex)
         {
-            _backgroundForm.Bounds = Bounds;
-        }
-    }
-
-    private void BuildDeviceList()
-    {
-        Controls.Clear();
-
-        var header = new Panel
-        {
-            Dock = DockStyle.Top,
-            Height = 58,
-            Padding = new Padding(16, 12, 16, 6),
-            BackColor = TransparentBack
-        };
-
-        header.Controls.Add(new Label
-        {
-            AutoSize = false,
-            Dock = DockStyle.Top,
-            Height = 20,
-            Text = "Output device",
-            Font = BoldFont(10.5f),
-            ForeColor = TextMain,
-            BackColor = TransparentBack
-        });
-
-        header.Controls.Add(new Label
-        {
-            AutoSize = false,
-            Dock = DockStyle.Bottom,
-            Height = 18,
-            Text = "Select a device to use for all Windows output roles",
-            Font = BoldFont(8.5f),
-            ForeColor = TextMuted,
-            BackColor = TransparentBack
-        });
-
-        var list = new FlowLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            FlowDirection = FlowDirection.TopDown,
-            WrapContents = false,
-            AutoScroll = true,
-            Padding = new Padding(10, 4, 10, 10),
-            BackColor = TransparentBack
-        };
-
-        Controls.Add(list);
-        Controls.Add(header);
-
-        IReadOnlyList<AudioDevice> devices;
-        string? defaultDeviceId;
-        try
-        {
-            devices = _audioDeviceService.GetOutputDevices();
-            defaultDeviceId = _audioDeviceService.GetDefaultOutputDeviceId();
-        }
-        catch (Exception ex)
-        {
-            list.Controls.Add(CreateMessageLabel($"Failed to load output devices.\r\n{ex.Message}"));
             return;
         }
 
-        if (devices.Count == 0)
+        _hoveredIndex = hoveredIndex;
+        RenderLayeredWindow();
+    }
+
+    protected override void OnMouseLeave(EventArgs e)
+    {
+        base.OnMouseLeave(e);
+        if (_hoveredIndex == -1)
         {
-            list.Controls.Add(CreateMessageLabel("No output devices found."));
+            return;
         }
 
-        foreach (var device in devices)
+        _hoveredIndex = -1;
+        RenderLayeredWindow();
+    }
+
+    protected override void OnMouseClick(MouseEventArgs e)
+    {
+        base.OnMouseClick(e);
+        if (e.Button != MouseButtons.Left)
         {
-            list.Controls.Add(new DeviceItemControl(
-                device,
-                string.Equals(device.Id, defaultDeviceId, StringComparison.OrdinalIgnoreCase),
-                OnDeviceSelected));
+            return;
+        }
+
+        var index = HitTestDevice(e.Location);
+        if (index < 0 || index >= _devices.Count)
+        {
+            return;
+        }
+
+        OnDeviceSelected(_devices[index]);
+    }
+
+    private void LoadDevices()
+    {
+        try
+        {
+            _devices = _audioDeviceService.GetOutputDevices();
+            _defaultDeviceId = _audioDeviceService.GetDefaultOutputDeviceId();
+            _errorMessage = null;
+        }
+        catch (Exception ex)
+        {
+            _devices = Array.Empty<AudioDevice>();
+            _defaultDeviceId = null;
+            _errorMessage = $"Failed to load output devices.\r\n{ex.Message}";
         }
     }
 
-    private static Label CreateMessageLabel(string text)
+    private int HitTestDevice(Point point)
     {
-        return new Label
+        if (_errorMessage is not null || point.X < ItemLeft || point.X > ItemLeft + ItemWidth || point.Y < ListTop)
         {
-            AutoSize = false,
-            Width = 320,
-            Height = 84,
-            Margin = new Padding(4, 8, 4, 4),
-            Text = text,
-            TextAlign = ContentAlignment.MiddleLeft,
-            Font = BoldFont(9f),
-            ForeColor = TextMain,
-            BackColor = TransparentBack
-        };
-    }
+            return -1;
+        }
 
-    private static Font BoldFont(float size)
-    {
-        return new Font(FontFamily.GenericSansSerif, size, FontStyle.Bold);
+        var offset = point.Y - ListTop;
+        var stride = RowHeight + RowGap;
+        var index = offset / stride;
+        var yInRow = offset % stride;
+        return index >= 0 && index < _devices.Count && yInRow < RowHeight ? index : -1;
     }
 
     private void OnDeviceSelected(AudioDevice device)
@@ -200,87 +181,139 @@ internal sealed class PopupForm : Form
         }
     }
 
-    private sealed class PopupBackgroundForm : Form
+    private void RenderLayeredWindow()
     {
-        public PopupBackgroundForm(Color backColor, double opacity)
+        if (!IsHandleCreated)
         {
-            BackColor = backColor;
-            Opacity = opacity;
-            TopMost = true;
-            FormBorderStyle = FormBorderStyle.None;
-            ShowInTaskbar = false;
-            StartPosition = FormStartPosition.Manual;
+            return;
+        }
+
+        using var bitmap = new Bitmap(Width, Height, PixelFormat.Format32bppPArgb);
+        using (var graphics = Graphics.FromImage(bitmap))
+        {
+            graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            graphics.Clear(Color.Transparent);
+            DrawPopup(graphics);
+        }
+
+        var screenDc = GetDC(IntPtr.Zero);
+        var memoryDc = CreateCompatibleDC(screenDc);
+        var bitmapHandle = bitmap.GetHbitmap(Color.FromArgb(0));
+        var oldBitmap = SelectObject(memoryDc, bitmapHandle);
+
+        try
+        {
+            var top = new Point(Left, Top);
+            var size = new Size(Width, Height);
+            var source = Point.Empty;
+            var blend = new BlendFunction
+            {
+                BlendOp = 0,
+                BlendFlags = 0,
+                SourceConstantAlpha = 255,
+                AlphaFormat = 1
+            };
+
+            UpdateLayeredWindow(Handle, screenDc, ref top, ref size, memoryDc, ref source, 0, ref blend, 2);
+        }
+        finally
+        {
+            SelectObject(memoryDc, oldBitmap);
+            DeleteObject(bitmapHandle);
+            DeleteDC(memoryDc);
+            ReleaseDC(IntPtr.Zero, screenDc);
         }
     }
 
-    private sealed class DeviceItemControl : Control
+    private void DrawPopup(Graphics graphics)
     {
-        private static readonly Color HoverBack = Color.FromArgb(58, 58, 58);
-        private static readonly Color SelectedBack = Color.FromArgb(48, 68, 88);
-        private static readonly Color SelectedMark = Color.FromArgb(96, 205, 255);
+        using var background = new SolidBrush(BackPanel);
+        graphics.FillRectangle(background, new Rectangle(0, 0, Width, Height));
 
-        private readonly AudioDevice _device;
-        private readonly bool _selected;
-        private readonly Action<AudioDevice> _onSelected;
-        private bool _hovered;
+        using var borderPen = new Pen(Border);
+        graphics.DrawRectangle(borderPen, 0, 0, Width - 1, Height - 1);
 
-        public DeviceItemControl(AudioDevice device, bool selected, Action<AudioDevice> onSelected)
+        using var titleBrush = new SolidBrush(TextMain);
+        using var captionBrush = new SolidBrush(TextMuted);
+        graphics.DrawString("Output device", _titleFont, titleBrush, new RectangleF(16, 12, Width - 32, 22));
+        graphics.DrawString("Select a device to use for all Windows output roles", _captionFont, captionBrush, new RectangleF(16, 36, Width - 32, 18));
+
+        if (_errorMessage is not null)
         {
-            _device = device;
-            _selected = selected;
-            _onSelected = onSelected;
-
-            Width = 326;
-            Height = 42;
-            Margin = new Padding(0, 2, 0, 2);
-            Cursor = Cursors.Hand;
-            Font = BoldFont(9f);
-            DoubleBuffered = true;
+            graphics.DrawString(_errorMessage, _itemFont, titleBrush, new RectangleF(16, ListTop + 8, Width - 32, 90));
+            return;
         }
 
-        protected override void OnMouseEnter(EventArgs e)
+        if (_devices.Count == 0)
         {
-            _hovered = true;
-            Invalidate();
-            base.OnMouseEnter(e);
+            graphics.DrawString("No output devices found.", _itemFont, titleBrush, new RectangleF(16, ListTop + 8, Width - 32, 40));
+            return;
         }
 
-        protected override void OnMouseLeave(EventArgs e)
+        for (var i = 0; i < _devices.Count; i++)
         {
-            _hovered = false;
-            Invalidate();
-            base.OnMouseLeave(e);
+            DrawDeviceItem(graphics, i, _devices[i]);
+        }
+    }
+
+    private void DrawDeviceItem(Graphics graphics, int index, AudioDevice device)
+    {
+        var selected = string.Equals(device.Id, _defaultDeviceId, StringComparison.OrdinalIgnoreCase);
+        var hovered = index == _hoveredIndex;
+        var top = ListTop + index * (RowHeight + RowGap);
+        var bounds = new Rectangle(ItemLeft, top, ItemWidth, RowHeight);
+
+        if (selected || hovered)
+        {
+            using var itemBackground = new SolidBrush(selected ? SelectedBack : HoverBack);
+            graphics.FillRectangle(itemBackground, bounds);
         }
 
-        protected override void OnClick(EventArgs e)
+        var textLeft = selected ? ItemLeft + 32 : ItemLeft + 16;
+        if (selected)
         {
-            base.OnClick(e);
-            _onSelected(_device);
+            using var mark = new SolidBrush(SelectedMark);
+            graphics.FillEllipse(mark, ItemLeft + 12, top + 15, 12, 12);
         }
 
-        protected override void OnPaint(PaintEventArgs e)
+        using var textBrush = new SolidBrush(TextMain);
+        using var format = new StringFormat
         {
-            base.OnPaint(e);
-            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            Alignment = StringAlignment.Near,
+            LineAlignment = StringAlignment.Center,
+            Trimming = StringTrimming.EllipsisCharacter,
+            FormatFlags = StringFormatFlags.NoWrap
+        };
+        graphics.DrawString(device.Name, _itemFont, textBrush, new RectangleF(textLeft, top, ItemLeft + ItemWidth - textLeft - 12, RowHeight), format);
+    }
 
-            var bounds = new Rectangle(0, 0, Width - 1, Height - 1);
-            using var background = new SolidBrush(_selected ? SelectedBack : _hovered ? HoverBack : TransparentBack);
-            e.Graphics.FillRectangle(background, bounds);
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetDC(IntPtr hwnd);
 
-            if (_selected)
-            {
-                using var mark = new SolidBrush(SelectedMark);
-                e.Graphics.FillEllipse(mark, 12, 15, 12, 12);
-            }
+    [DllImport("user32.dll")]
+    private static extern int ReleaseDC(IntPtr hwnd, IntPtr hdc);
 
-            var textBounds = new Rectangle(_selected ? 32 : 16, 0, Width - (_selected ? 44 : 28), Height);
-            TextRenderer.DrawText(
-                e.Graphics,
-                _device.Name,
-                Font,
-                textBounds,
-                TextMain,
-                TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
-        }
+    [DllImport("user32.dll")]
+    private static extern bool UpdateLayeredWindow(IntPtr hwnd, IntPtr hdcDst, ref Point pptDst, ref Size psize, IntPtr hdcSrc, ref Point pptSrc, int crKey, ref BlendFunction pblend, int dwFlags);
+
+    [DllImport("gdi32.dll")]
+    private static extern IntPtr CreateCompatibleDC(IntPtr hdc);
+
+    [DllImport("gdi32.dll")]
+    private static extern bool DeleteDC(IntPtr hdc);
+
+    [DllImport("gdi32.dll")]
+    private static extern IntPtr SelectObject(IntPtr hdc, IntPtr hgdiobj);
+
+    [DllImport("gdi32.dll")]
+    private static extern bool DeleteObject(IntPtr hObject);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct BlendFunction
+    {
+        public byte BlendOp;
+        public byte BlendFlags;
+        public byte SourceConstantAlpha;
+        public byte AlphaFormat;
     }
 }
