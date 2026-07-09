@@ -1,6 +1,6 @@
 ﻿using System.Runtime.InteropServices;
 
-namespace AudioQuickSwitch.Native;
+namespace OneclickAudioSwap.Native;
 
 internal enum EDataFlow
 {
@@ -76,3 +76,4 @@ internal interface IMMDevice
     [PreserveSig]
     int GetState(out uint state);
 }
+

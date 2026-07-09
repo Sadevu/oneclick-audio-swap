@@ -1,6 +1,6 @@
-﻿using AudioQuickSwitch.Services;
+﻿using OneclickAudioSwap.Services;
 
-namespace AudioQuickSwitch;
+namespace OneclickAudioSwap;
 
 internal sealed class TrayApplicationContext : ApplicationContext
 {
@@ -15,7 +15,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _trayIcon = new NotifyIcon
         {
             Icon = _appIcon,
-            Text = "AudioQuickSwitch",
+            Text = "OneclickAudioSwap",
             Visible = true,
             ContextMenuStrip = BuildContextMenu()
         };
@@ -63,3 +63,4 @@ internal sealed class TrayApplicationContext : ApplicationContext
             workingArea.Bottom - popupSize.Height - 12);
     }
 }
+

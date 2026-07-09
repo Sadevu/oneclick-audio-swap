@@ -1,7 +1,7 @@
 ﻿using System.Runtime.InteropServices;
-using AudioQuickSwitch.Native;
+using OneclickAudioSwap.Native;
 
-namespace AudioQuickSwitch.Services;
+namespace OneclickAudioSwap.Services;
 
 internal sealed class DefaultDeviceService
 {
@@ -34,3 +34,4 @@ internal sealed class DefaultDeviceService
         return (T)Activator.CreateInstance(type)!;
     }
 }
+

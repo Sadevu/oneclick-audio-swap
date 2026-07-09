@@ -1,6 +1,6 @@
 ﻿using System.Runtime.InteropServices;
 
-namespace AudioQuickSwitch.Native;
+namespace OneclickAudioSwap.Native;
 
 [StructLayout(LayoutKind.Sequential)]
 internal readonly struct PropertyKey
@@ -80,3 +80,4 @@ internal static class NativeMethods
         in Guid interfaceId,
         out IntPtr instance);
 }
+

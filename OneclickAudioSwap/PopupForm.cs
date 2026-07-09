@@ -1,6 +1,6 @@
-﻿using AudioQuickSwitch.Services;
+﻿using OneclickAudioSwap.Services;
 
-namespace AudioQuickSwitch;
+namespace OneclickAudioSwap;
 
 internal sealed class PopupForm : Form
 {
@@ -12,7 +12,7 @@ internal sealed class PopupForm : Form
         _audioDeviceService = audioDeviceService;
         _defaultDeviceService = defaultDeviceService;
 
-        Text = "AudioQuickSwitch";
+        Text = "OneclickAudioSwap";
         Icon = appIcon;
         FormBorderStyle = FormBorderStyle.FixedSingle;
         MaximizeBox = false;
@@ -95,7 +95,8 @@ internal sealed class PopupForm : Form
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, ex.Message, "AudioQuickSwitch", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show(this, ex.Message, "OneclickAudioSwap", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 }
+

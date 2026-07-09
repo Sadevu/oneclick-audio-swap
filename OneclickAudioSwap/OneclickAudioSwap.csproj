@@ -15,3 +15,4 @@
     <Content Include="..\ico\oneclick-audio-swap.ico" Link="oneclick-audio-swap.ico" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
+

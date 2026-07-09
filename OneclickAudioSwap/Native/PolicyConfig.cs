@@ -1,6 +1,6 @@
 ﻿using System.Runtime.InteropServices;
 
-namespace AudioQuickSwitch.Native;
+namespace OneclickAudioSwap.Native;
 
 [ComImport]
 [Guid("870AF99C-171D-4F9E-AF0D-E63DF40C2BC9")]
@@ -26,3 +26,4 @@ internal interface IPolicyConfig
     int SetDefaultEndpoint([MarshalAs(UnmanagedType.LPWStr)] string deviceId, ERole role);
     int SetEndpointVisibility();
 }
+

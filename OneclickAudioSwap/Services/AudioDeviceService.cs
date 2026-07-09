@@ -1,7 +1,7 @@
 ﻿using System.Runtime.InteropServices;
-using AudioQuickSwitch.Native;
+using OneclickAudioSwap.Native;
 
-namespace AudioQuickSwitch.Services;
+namespace OneclickAudioSwap.Services;
 
 internal sealed unsafe class AudioDeviceService
 {
@@ -141,3 +141,4 @@ internal sealed unsafe class AudioDeviceService
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
     private delegate int PropertyStoreGetValueDelegate(IntPtr self, in PropertyKey key, out PropVariant value);
 }
+

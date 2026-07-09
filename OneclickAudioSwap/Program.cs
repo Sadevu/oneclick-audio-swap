@@ -1,11 +1,11 @@
-﻿namespace AudioQuickSwitch;
+﻿namespace OneclickAudioSwap;
 
 internal static class Program
 {
     [STAThread]
     private static void Main()
     {
-        using var mutex = new Mutex(initiallyOwned: true, "Global\\AudioQuickSwitch", out var createdNew);
+        using var mutex = new Mutex(initiallyOwned: true, "Global\\OneclickAudioSwap", out var createdNew);
         if (!createdNew)
         {
             return;
@@ -15,3 +15,4 @@ internal static class Program
         Application.Run(new TrayApplicationContext());
     }
 }
+
