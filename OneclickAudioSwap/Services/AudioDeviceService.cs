@@ -10,18 +10,11 @@ internal sealed unsafe class AudioDeviceService
 
     public IReadOnlyList<AudioDevice> GetOutputDevices()
     {
-        var enumerator = IntPtr.Zero;
+        var enumerator = CreateEnumerator();
         var collection = IntPtr.Zero;
 
         try
         {
-            Marshal.ThrowExceptionForHR(NativeMethods.CoCreateInstance(
-                in MMDeviceEnumeratorClsid,
-                IntPtr.Zero,
-                1,
-                in IMMDeviceEnumeratorIid,
-                out enumerator));
-
             Marshal.ThrowExceptionForHR(EnumAudioEndpoints(enumerator, EDataFlow.eRender, DeviceStates.Active, out collection));
             Marshal.ThrowExceptionForHR(CollectionGetCount(collection, out var count));
 
@@ -48,11 +41,54 @@ internal sealed unsafe class AudioDeviceService
                 Marshal.Release(collection);
             }
 
-            if (enumerator != IntPtr.Zero)
+            Marshal.Release(enumerator);
+        }
+    }
+
+    public string? GetDefaultOutputDeviceId()
+    {
+        var enumerator = CreateEnumerator();
+        var device = IntPtr.Zero;
+
+        try
+        {
+            var result = GetDefaultAudioEndpoint(enumerator, EDataFlow.eRender, ERole.eMultimedia, out device);
+            if (result < 0)
             {
-                Marshal.Release(enumerator);
+                return null;
+            }
+
+            Marshal.ThrowExceptionForHR(DeviceGetId(device, out var idPointer));
+            try
+            {
+                return Marshal.PtrToStringUni(idPointer);
+            }
+            finally
+            {
+                Marshal.FreeCoTaskMem(idPointer);
             }
         }
+        finally
+        {
+            if (device != IntPtr.Zero)
+            {
+                Marshal.Release(device);
+            }
+
+            Marshal.Release(enumerator);
+        }
+    }
+
+    private static IntPtr CreateEnumerator()
+    {
+        Marshal.ThrowExceptionForHR(NativeMethods.CoCreateInstance(
+            in MMDeviceEnumeratorClsid,
+            IntPtr.Zero,
+            1,
+            in IMMDeviceEnumeratorIid,
+            out var enumerator));
+
+        return enumerator;
     }
 
     private static AudioDevice ReadDevice(IntPtr device)
@@ -84,6 +120,12 @@ internal sealed unsafe class AudioDeviceService
     {
         var method = GetMethod<EnumAudioEndpointsDelegate>(self, 3);
         return method(self, dataFlow, stateMask, out devices);
+    }
+
+    private static int GetDefaultAudioEndpoint(IntPtr self, EDataFlow dataFlow, ERole role, out IntPtr endpoint)
+    {
+        var method = GetMethod<GetDefaultAudioEndpointDelegate>(self, 4);
+        return method(self, dataFlow, role, out endpoint);
     }
 
     private static int CollectionGetCount(IntPtr self, out uint count)
@@ -127,6 +169,9 @@ internal sealed unsafe class AudioDeviceService
     private delegate int EnumAudioEndpointsDelegate(IntPtr self, EDataFlow dataFlow, uint stateMask, out IntPtr devices);
 
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+    private delegate int GetDefaultAudioEndpointDelegate(IntPtr self, EDataFlow dataFlow, ERole role, out IntPtr endpoint);
+
+    [UnmanagedFunctionPointer(CallingConvention.StdCall)]
     private delegate int CollectionGetCountDelegate(IntPtr self, out uint count);
 
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
@@ -141,4 +186,3 @@ internal sealed unsafe class AudioDeviceService
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
     private delegate int PropertyStoreGetValueDelegate(IntPtr self, in PropertyKey key, out PropVariant value);
 }
-

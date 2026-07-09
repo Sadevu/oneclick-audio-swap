@@ -11,7 +11,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
     public TrayApplicationContext()
     {
-        _appIcon = new Icon(Path.Combine(AppContext.BaseDirectory, "oneclick-audio-swap.ico"));
+        _appIcon = new Icon(Path.Combine(AppContext.BaseDirectory, "icon.ico"));
         _trayIcon = new NotifyIcon
         {
             Icon = _appIcon,
@@ -63,4 +63,3 @@ internal sealed class TrayApplicationContext : ApplicationContext
             workingArea.Bottom - popupSize.Height - 12);
     }
 }
-
